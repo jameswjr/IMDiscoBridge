@@ -14,6 +14,10 @@
 
 ## Features
 
+**🚧 STILL UNTESTED — This is a preview of a development project.**  
+This notice will be removed when the system passes its first successful test.  
+**Use at your own risk!**
+
 - Full iMessage message forwarding into Discord
 - Replies from Discord sent back into iMessage
 - Dynamic Discord channel creation
@@ -33,7 +37,7 @@
 
 ---
 
-### 1. Install & Configure
+### Install & Configure
 
 See [docs/INSTALL.md](docs/INSTALL.md) for full instructions including Discord bot setup, test mode, and macOS auto-start.
 
