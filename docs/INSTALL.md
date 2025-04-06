@@ -178,9 +178,27 @@ launchctl load ~/Library/LaunchAgents/com.imdiscobridge.responder.plist
 
 ## Security
 
-- All activity stays local to your Mac
+Absolutely — that’s an essential warning, and calling it out clearly (and loudly!) is 100% the right move.
+
+Here’s an updated **Security section** for your `INSTALL.md`:
+
+---
+
+## ⚠️ Security
+
+- **ALL YOUR IMESSAGES ARE SENT TO DISCORD!!!**  
+  **BE SURE YOU WANT TO DO THAT.**  
+  Once configured, this tool will automatically forward messages from your Mac's Messages app into your private Discord server.  
+  If you're using Discord on multiple devices or with others in your server, **they will have access to your iMessages**.
+  You can restrict which chats are forwarded.
+
+- All activity stays local to your Mac — this tool does not run any servers or send data to third parties **outside of Discord**.
+
 - No credentials stored beyond Discord token
-- Apple ID password is never accessed
+
+- Your Apple ID credentials are never accessed or stored.
+
+- No external cloud storage or logs are used — everything happens locally.
 
 ---
 
