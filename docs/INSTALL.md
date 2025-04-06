@@ -77,13 +77,31 @@ cp -r scripts launch config README.md ~/imdiscobridge/
 cp config/config.example.json ~/imdiscobridge/config/config.json
 ```
 
----
+### 3. Python Environment Setup (Recommended)
 
-## Configuration
+**You must install and use IMDiscoBridge within a Python virtual environment.**
+All instructions and system integration (including MacOS auto-start) assume this setup.
+
+```bash
+cd ~/imdiscobridge
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+To exit the virtual environment later:
+
+```bash
+deactivate
+```
+
+> Dependencies are listed in `requirements.txt`, including `requests` and `discord.py`.
+
+## Configuration and Use
 
 ### 1. Copy and Edit Your Config File
 
-The repo provides a template config file:
+The repo provides a template config file. If you did not copy it earlier, do so now:
 
 ```bash
 cp ~/imdiscobridge/config/config.example.json ~/imdiscobridge/config/config.json
@@ -112,7 +130,7 @@ Then edit `~/imdiscobridge/config/config.json`:
 - `discord_bot_token`: Get this from the [Discord Developer Portal](https://discord.com/developers/applications)
 - `default_guild_id`: Right-click your server in Discord → "Copy Server ID"
 - `user_id_whitelist`: List of Discord user IDs allowed to send messages back (leave empty for all)
-- `whitelisted_chats`: Restrict forwarding to certain iMessage threads (safe for testing)
+- `whitelisted_chats`: Restrict forwarding to certain iMessage threads (safe for testing, also for restricted use)
 - `poll_interval_seconds`: How often to check the DB
 - `burst_poll_interval`: Fastest polling interval in “burst mode”
 - `active_poll_interval`: Interval for chats recently active
@@ -138,6 +156,12 @@ python3 ~/imdiscobridge/scripts/forwarder.py
 python3 ~/imdiscobridge/scripts/responder.py
 ```
 
+Note: Each time you open a new terminal session, you’ll need to reactivate the virtual environment (venv), if you used that:
+
+```bash
+source ~/imdiscobridge/venv/bin/activate
+```
+
 ---
 
 ## Going Live (Enable All Chats)
@@ -159,11 +183,43 @@ Update `config.json`:
 cp launch/com.imdiscobridge.*.plist ~/Library/LaunchAgents/
 ```
 
-### 2. Load with `launchctl`
+### 2. Customize Launch Files
+
+IMPORTANT: The launch plist files need your macOS username, so
+you must update the paths in each .plist file to reflect your actual home directory.
+
+For example, in the ProgramArguments section of your .plist, change:
+
+<string>/Users/YOURUSERNAME/imdiscobridge/venv/bin/python</string>
+<string>/Users/YOURUSERNAME/imdiscobridge/scripts/forwarder.py</string>
+
+...to:
+
+<string>/Users/YOUR_ACTUAL_USERNAME/imdiscobridge/venv/bin/python</string>
+<string>/Users/YOUR_ACTUAL_USERNAME/imdiscobridge/scripts/forwarder.py</string>
+
+You can edit the .plist files with a text editor before installing them:
+
+nano launch/com.imdiscobridge.forwarder.plist
+
+### 3. Load with `launchctl`
 
 ```bash
 launchctl load ~/Library/LaunchAgents/com.imdiscobridge.forwarder.plist
 launchctl load ~/Library/LaunchAgents/com.imdiscobridge.responder.plist
+```
+
+### 4. Confirm everything works:
+
+```
+launchctl list | grep imdiscobridge
+```
+
+To stop or reload:
+
+```
+launchctl unload ~/Library/LaunchAgents/com.imdiscobridge.forwarder.plist
+launchctl unload ~/Library/LaunchAgents/com.imdiscobridge.responder.plist
 ```
 
 ---

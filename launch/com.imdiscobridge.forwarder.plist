@@ -5,7 +5,7 @@
     <string>com.imdiscobridge.forwarder</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
+        <string>/Users/YOURUSERNAME/imdiscobridge/venv/bin/python</string>
         <string>/Users/YOURNAME/imdiscobridge/scripts/forwarder.py</string>
     </array>
     <key>RunAtLoad</key>

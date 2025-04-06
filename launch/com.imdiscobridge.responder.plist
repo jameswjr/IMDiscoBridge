@@ -5,7 +5,7 @@
     <string>com.imdiscobridge.responder</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
+        <string>/Users/YOURUSERNAME/imdiscobridge/venv/bin/python</string>
         <string>/Users/YOURNAME/imdiscobridge/scripts/responder.py</string>
     </array>
     <key>RunAtLoad</key>
