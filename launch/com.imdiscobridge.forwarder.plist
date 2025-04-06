@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.imdiscobridge.forwarder</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/YOURNAME/imdiscobridge/scripts/forwarder.py</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/imdiscobridge_forwarder.out</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/imdiscobridge_forwarder.err</string>
+</dict>
+</plist>

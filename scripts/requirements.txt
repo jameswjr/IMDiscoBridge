@@ -1,0 +1,2 @@
+discord.py==2.5.2
+watchdog==6.0.0

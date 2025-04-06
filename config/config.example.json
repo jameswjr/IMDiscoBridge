@@ -1,0 +1,14 @@
+{
+  "discord_webhook_url": "https://discord.com/api/webhooks/dummy",
+  "discord_bot_token": "your-bot-token",
+  "default_guild_id": "your-guild-id",
+  "user_id_whitelist": [],
+  "poll_interval_seconds": 10,
+  "burst_trigger_count": 8,
+  "burst_window_seconds": 10,
+  "burst_poll_interval": 0.5,
+  "active_poll_interval": 10,  
+  "default_poll_interval": 30,
+  "global_discovery_interval": 15,
+  "whitelisted_chats": []
+}
