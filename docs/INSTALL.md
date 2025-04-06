@@ -25,16 +25,35 @@ IMDiscoBridge:
 - Python 3.8 or later (`python3 --version`)
 - Terminal access
 
-### External Setup
-1. Create a Discord Server for private use
-2. Create a Discord Bot at https://discord.com/developers/applications
-   - Enable MESSAGE CONTENT INTENT
-   - Generate a bot token
-   - Invite the bot to your server using OAuth2 with permissions:
-     - Manage Channels
-     - Send Messages
-     - Read Message History
-     - View Channels
+### Discord Setup (Required)
+
+### 1. Create a Discord Server
+- Open [https://discord.com](https://discord.com)
+- Click the `+` button in the server list (left sidebar)
+- Choose “Create My Own”
+- Name it (e.g., `IMDiscoBridge Server`)
+- Set it to Private (recommended)
+
+### 2. Create a Discord Bot
+
+- Go to [https://discord.com/developers/applications](https://discord.com/developers/applications)
+- Click **"New Application"** and name it something like `IMDiscoBridgeBot`
+- Go to **Bot** (left sidebar) → click **"Add Bot"**
+- Under **Privileged Gateway Intents**, **enable**:
+  - `MESSAGE CONTENT INTENT`
+- Copy the bot **token** (you’ll paste this into your `config.json` later)
+
+### 3. Invite the Bot to Your Server
+
+- Go to **OAuth2 > URL Generator**
+  - Scopes: check `bot`
+  - Bot Permissions: check
+    - `View Channels`
+    - `Send Messages`
+    - `Read Message History`
+    - `Manage Channels`
+- Copy the generated URL and visit it in your browser
+- Select your Discord server to invite the bot
 
 ---
 
@@ -50,25 +69,56 @@ cd IMDiscoBridge
 ### 2. Set Up Project Structure
 
 ```bash
-mkdir -p ~/improxy/{config,state}
-cp -r scripts launch config README.md ~/improxy/
-cp config/config.example.json ~/improxy/config/config.json
+mkdir -p ~/imdiscobridge/{config,state}
+cp -r scripts launch config README.md ~/imdiscobridge/
+cp config/config.example.json ~/imdiscobridge/config/config.json
 ```
 
 ---
 
 ## Configuration
 
-### 1. Edit `~/improxy/config/config.json`
+### 1. Copy and Edit Your Config File
+
+The repo provides a template config file:
+
+```bash
+cp ~/imdiscobridge/config/config.example.json ~/imdiscobridge/config/config.json
+```
+
+Then edit `~/imdiscobridge/config/config.json`:
+
+```json
+{
+  "discord_webhook_url": "https://discord.com/api/webhooks/dummy",
+  "discord_bot_token": "your-bot-token",
+  "default_guild_id": "your-guild-id",
+  "user_id_whitelist": [],
+  "poll_interval_seconds": 10,
+  "burst_trigger_count": 8,
+  "burst_window_seconds": 10,
+  "burst_poll_interval": 0.5,
+  "active_poll_interval": 10,
+  "default_poll_interval": 30,
+  "global_discovery_interval": 15,
+  "whitelisted_chats": []
+}
+```
+
+### Key Fields:
+- `discord_bot_token`: Get this from the [Discord Developer Portal](https://discord.com/developers/applications)
+- `default_guild_id`: Right-click your server in Discord → "Copy Server ID"
+- `user_id_whitelist`: List of Discord user IDs allowed to send messages back (leave empty for all)
+- `whitelisted_chats`: Restrict forwarding to certain iMessage threads (safe for testing)
+- `poll_interval_seconds`: How often to check the DB
+- `burst_poll_interval`: Fastest polling interval in “burst mode”
+- `active_poll_interval`: Interval for chats recently active
+- `default_poll_interval`: Used for quiet/inactive chats
 
 Start in test mode with 1–2 whitelisted chats:
 
 ```json
 {
-  "discord_webhook_url": "https://discord.com/api/webhooks/dummy",
-  "discord_bot_token": "YOUR_DISCORD_BOT_TOKEN",
-  "default_guild_id": "YOUR_DISCORD_SERVER_ID",
-  "user_id_whitelist": ["YOUR_DISCORD_USER_ID"],
   "whitelisted_chats": ["iMessage;chat123abc"]
 }
 ```
@@ -79,10 +129,10 @@ Start in test mode with 1–2 whitelisted chats:
 
 ```bash
 # Terminal 1
-python3 ~/improxy/scripts/forwarder.py
+python3 ~/imdiscobridge/scripts/forwarder.py
 
 # Terminal 2
-python3 ~/improxy/scripts/responder.py
+python3 ~/imdiscobridge/scripts/responder.py
 ```
 
 ---
@@ -103,14 +153,14 @@ Update `config.json`:
 ### 1. Copy Launch Agent Files
 
 ```bash
-cp launch/com.improxy.*.plist ~/Library/LaunchAgents/
+cp launch/com.imdiscobridge.*.plist ~/Library/LaunchAgents/
 ```
 
 ### 2. Load with `launchctl`
 
 ```bash
-launchctl load ~/Library/LaunchAgents/com.improxy.forwarder.plist
-launchctl load ~/Library/LaunchAgents/com.improxy.responder.plist
+launchctl load ~/Library/LaunchAgents/com.imdiscobridge.forwarder.plist
+launchctl load ~/Library/LaunchAgents/com.imdiscobridge.responder.plist
 ```
 
 ---

@@ -22,7 +22,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("/var/log/improxy_forwarder.log"),
+        logging.FileHandler("/var/log/imdiscobridge_forwarder.log"),
         logging.StreamHandler()
     ]
 )
