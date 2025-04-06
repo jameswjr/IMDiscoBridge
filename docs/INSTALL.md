@@ -2,6 +2,9 @@
 
 > **WARNING:** This is **experimental software**. It interfaces with system-level Apple Messages data using AppleScript and direct SQLite queries. It has not been audited for security, privacy, or long-term stability. **Use at your own risk.**
 
+> 🚧 STILL UNTESTED — This is a preview of a development project.
+This notice will be removed when the system passes its first successful test.
+
 > This tool **does not** collect or transmit data anywhere except to your configured Discord server.
 
 ---
@@ -173,14 +176,6 @@ launchctl load ~/Library/LaunchAgents/com.imdiscobridge.responder.plist
   osascript -e 'tell application "Messages" to send "test" to chat id "iMessage;chatABC123"'
   ```
 - Bot unresponsive? Verify config settings and bot permissions.
-
----
-
-## Security
-
-Absolutely — that’s an essential warning, and calling it out clearly (and loudly!) is 100% the right move.
-
-Here’s an updated **Security section** for your `INSTALL.md`:
 
 ---
 
