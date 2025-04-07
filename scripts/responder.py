@@ -3,8 +3,6 @@ import json
 import asyncio
 import time  # For retry delays
 import fcntl  # For file locking
-import tempfile  # For atomic writes
-import subprocess
 import discord
 import logging
 from watchdog.observers import Observer

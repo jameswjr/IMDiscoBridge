@@ -9,7 +9,6 @@ import logging
 from datetime import datetime, timedelta
 from collections import deque
 import random
-import asyncio
 
 # Define base directory relative to the script's location
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -279,9 +278,12 @@ def main():
     # Load state with locking
     try:
         state = read_state_file(STATE_PATH)
+        # Convert message_times to deque for all chats
+        for chat_guid, chat_state in state.get("chats", {}).items():
+            chat_state["message_times"] = deque(chat_state.get("message_times", []), maxlen=100)
     except Exception as e:
         logger.critical(f"Failed to load state.json with locking: {e}")
-        return
+        state = {"chats": {}}
 
     # Ensure "chats" key exists in the state
     if "chats" not in state:
@@ -330,7 +332,7 @@ def main():
                 chat_state = state["chats"].setdefault(chat_guid, {
                     "last_seen_rowid": 0,
                     "poll_interval": default_poll_interval,
-                    "message_times": [],
+                    "message_times": deque(maxlen=100),  # Initialize as deque
                     "burst_mode": False,
                     "last_polled": "1970-01-01T00:00:00",
                     "active_until": now.isoformat(),
@@ -384,7 +386,7 @@ def main():
                         send_to_discord_channel(bot_token, channel_id, f"[{sender} @ {timestamp}]: {text}")
                     chat_state["last_seen_rowid"] = rowid
                     chat_state["active_until"] = (now + timedelta(minutes=10)).isoformat()
-                    chat_state["message_times"].append(timestamp)
+                    chat_state["message_times"].append(timestamp)  # Append to deque
 
                     # Check for name changes
                     last_name_check = datetime.fromisoformat(chat_state.get("last_name_check", "1970-01-01T00:00:00"))
@@ -404,8 +406,17 @@ def main():
             chat_state["message_times"] = list(times)
 
         # Save state after processing all chats with locking
+        state_to_save = {
+            "chats": {
+                chat_guid: {
+                    **chat_state,
+                    "message_times": list(chat_state["message_times"])  # Convert deque to list here
+                }
+                for chat_guid, chat_state in state["chats"].items()
+            }
+        }
         try:
-            write_state_file(STATE_PATH, state)
+            write_state_file(STATE_PATH, state_to_save)
         except Exception as e:
             logger.error(f"Failed to save state.json with locking: {e}")
 
