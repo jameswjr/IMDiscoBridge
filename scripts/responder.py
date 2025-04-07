@@ -7,14 +7,27 @@ import logging
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# Initialize logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
-
-# Define paths
+# Define base directory relative to the script's location
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Define deterministic paths
+LOG_DIR = os.path.join(BASE_DIR, "../logs")
+LOG_FILE = os.path.join(LOG_DIR, "responder.log")
+
+# Ensure the log directory exists
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)
+
 CONFIG_PATH = os.path.join(BASE_DIR, "../config/config.json")
 STATE_PATH = os.path.join(BASE_DIR, "../state/state.json")
+
+# Initialize logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
 
 # Load JSON with backup for corrupted files
 def load_json_with_backup(path):
@@ -27,7 +40,7 @@ def load_json_with_backup(path):
         if os.path.exists(path):
             os.rename(path, backup_path)
             logger.warning(f"Backed up corrupted file to {backup_path}")
-        return {}
+        return {"chats": {}}  # Initialize default state
 
 # Validate configuration
 def validate_config(config):
@@ -46,7 +59,7 @@ if not validate_config(config):
 state = load_json_with_backup(STATE_PATH)
 
 # Build Discord channel ID → iMessage GUID map
-channel_to_chat = {}
+channel_to_chat = state.get("chats", {})  # Ensure "chats" key exists
 for chat_guid, chat_info in state.get("chats", {}).items():
     if "discord_channel_id" in chat_info:
         channel_to_chat[str(chat_info["discord_channel_id"])] = chat_guid

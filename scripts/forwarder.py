@@ -13,6 +13,14 @@ import asyncio
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Define deterministic paths
+LOG_DIR = os.path.join(BASE_DIR, "../logs")
+LOG_FILE = os.path.join(LOG_DIR, "forwarder.log")
+
+# Ensure the log directory exists
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)
+
+# Define deterministic paths
 CONFIG_PATH = os.path.join(BASE_DIR, "../config/config.json")
 STATE_PATH = os.path.join(BASE_DIR, "../state/state.json")
 CHAT_DB_PATH = "/Library/Messages/chat.db"  # Fixed path for iMessage database on macOS
@@ -22,7 +30,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("/var/log/imdiscobridge_forwarder.log"),
+        logging.FileHandler(LOG_FILE),
         logging.StreamHandler()
     ]
 )
@@ -57,9 +65,14 @@ def load_json_with_backup(path):
         logger.error(f"Error loading JSON from {path}: {e}")
         backup_path = f"{path}.backup"
         if os.path.exists(path):
-            os.rename(path, backup_path)
+            os.rename(path, backup_path)  # Backup corrupted file
             logger.warning(f"Backed up corrupted file to {backup_path}")
-        return {}
+    return {}
+
+    # Ensure "chats" key exists in the state
+    if "chats" not in state:
+        state["chats"] = {}
+    return state
 
 # Save JSON with error handling
 def save_json(path, data):
@@ -95,7 +108,10 @@ def validate_config(config):
 # Retry database connection with exponential backoff
 @exponential_backoff(retries=5, base_delay=1, max_delay=16)
 def connect_to_database(path):
-    return sqlite3.connect(path)
+    conn = sqlite3.connect(path)
+    conn.execute("PRAGMA journal_mode=WAL;")  # Enable Write-Ahead Logging
+    logger.info("Connected to the database with WAL mode enabled.")
+    return conn
 
 def get_display_name(chat_db, handle_id):
     try:
@@ -156,11 +172,20 @@ def send_to_discord_channel(bot_token, channel_id, content):
             "Content-Type": "application/json"
         }
         payload = {"content": content}
-        response = requests.post(url, headers=headers, json=payload)
-        if response.status_code != 200 and response.status_code != 204:
-            logger.error(f"Failed to send message to Discord channel {channel_id}: {response.status_code} - {response.text}")
+        while True:
+            response = requests.post(url, headers=headers, json=payload)
+            if response.status_code == 200 or response.status_code == 204:
+                return True  # Message sent successfully
+            elif response.status_code == 429:  # Rate-limited
+                retry_after = float(response.headers.get("Retry-After", 1))  # Default to 1 second if missing
+                logger.warning(f"Rate-limited by Discord. Retrying after {retry_after} seconds...")
+                time.sleep(retry_after)
+            else:
+                logger.error(f"Failed to send message to Discord channel {channel_id}: {response.status_code} - {response.text}")
+                return False
     except requests.RequestException as e:
         logger.error(f"HTTP error while sending message to Discord channel {channel_id}: {e}")
+        return False
 
 def send_to_discord(webhook_url, sender, message_text, timestamp, chat_guid):
     try:
@@ -169,10 +194,17 @@ def send_to_discord(webhook_url, sender, message_text, timestamp, chat_guid):
             "username": chat_guid,
             "content": content
         }
-        response = requests.post(webhook_url, json=payload)
-        if response.status_code != 204:
-            logger.error(f"Failed to send message via webhook: {response.status_code} - {response.text}")
-        return response.status_code == 204
+        while True:
+            response = requests.post(webhook_url, json=payload)
+            if response.status_code == 204:
+                return True  # Message sent successfully
+            elif response.status_code == 429:  # Rate-limited
+                retry_after = float(response.headers.get("Retry-After", 1))  # Default to 1 second if missing
+                logger.warning(f"Rate-limited by Discord webhook. Retrying after {retry_after} seconds...")
+                time.sleep(retry_after)
+            else:
+                logger.error(f"Failed to send message via webhook: {response.status_code} - {response.text}")
+                return False
     except requests.RequestException as e:
         logger.error(f"HTTP error while sending message via webhook: {e}")
         return False
@@ -192,8 +224,9 @@ def get_active_chats(chat_db, since_time):
         cursor = chat_db.cursor()
         cursor.execute(query)
         return [row[0] for row in cursor.fetchall()]
-    except sqlite3.Error as e:
-        logger.error(f"Database error while fetching active chats: {e}")
+    except sqlite3.OperationalError as e:
+        if "database is locked" in str(e).lower():
+            logger.warning("Database locked while fetching active chats. Retrying...")
         return []
 
 def get_new_messages(chat_db, guid, last_seen_rowid):
@@ -270,6 +303,10 @@ def main():
     if not state:
         logger.critical("Failed to load state.json. System is non-functional.")
         return
+
+    # Ensure "chats" key exists in the state
+    if "chats" not in state:
+        state["chats"] = {}
 
     # Load configuration values
     webhook_url = config.get("discord_webhook_url")
