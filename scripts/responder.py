@@ -139,13 +139,16 @@ async def send_imessage_async(chat_guid, message):
     if len(sanitized_message) > 1000:  # Example limit
         sanitized_message = sanitized_message[:997] + "..."
         logger.warning("Message truncated due to excessive length.")
-    script = f'''
-    tell application "Messages"
-        send "{sanitized_message}" to chat id "{chat_guid}"
-    end tell
+    script = '''
+    on run {chatID, messageText}
+        set safeMessage to quoted form of messageText
+        tell application "Messages"
+            send safeMessage to chat id chatID
+        end tell
+    end run
     '''
     process = await asyncio.create_subprocess_exec(
-        "osascript", "-e", script,
+        "osascript", "-e", script, "--args", chat_guid, message,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
     )

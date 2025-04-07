@@ -274,15 +274,16 @@ def update_state_file(state, chat_guid, discord_channel_id, default_poll_interva
 
 # Sanitize AppleScript inputs
 async def send_imessage_async(chat_guid, message):
-    sanitized_message = message.replace('"', '\\"').replace("\\", "\\\\").replace("\n", "\\n")
-    sanitized_chat_guid = chat_guid.replace('"', '\\"').replace("\\", "\\\\")
-    script = f'''
+    script = '''
+on run {chatID, messageText}
+    set safeMessage to quoted form of messageText
     tell application "Messages"
-        send "{sanitized_message}" to chat id "{sanitized_chat_guid}"
+        send safeMessage to chat id chatID
     end tell
-    '''
+end run
+'''
     process = await asyncio.create_subprocess_exec(
-        "osascript", "-e", script,
+        "osascript", "-e", script, "--args", chat_guid, message,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
     )
