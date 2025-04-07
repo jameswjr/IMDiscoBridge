@@ -59,25 +59,6 @@ if not validate_config(config):
     logger.critical("Invalid configuration. Exiting.")
     exit(1)
 
-state = load_json_with_backup(STATE_PATH)
-
-# Build Discord channel ID → iMessage GUID map
-channel_to_chat = state.get("chats", {})  # Ensure "chats" key exists
-for chat_guid, chat_info in state.get("chats", {}).items():
-    if "discord_channel_id" in chat_info:
-        channel_to_chat[str(chat_info["discord_channel_id"])] = chat_guid
-
-discord_token = config["discord_bot_token"]
-user_whitelist = config.get("user_id_whitelist", [])  # Optional: list of Discord user IDs allowed to reply
-
-# Setup Discord client
-intents = discord.Intents.default()
-intents.messages = True
-intents.message_content = True
-client = discord.Client(intents=intents)
-
-state_lock = asyncio.Lock()
-
 # Read the state file with a shared lock and retries
 def read_state_file(state_path, retries=10, delay=0.1):
     for attempt in range(1, retries + 1):
@@ -96,31 +77,29 @@ def read_state_file(state_path, retries=10, delay=0.1):
                 logger.error("Failed to acquire shared lock on state file after multiple attempts.")
                 raise
 
-# Write the state file atomically with an exclusive lock and retries
-def write_state_file(state_path, data, retries=10, delay=0.1):
-    temp_dir = os.path.dirname(state_path)
-    with tempfile.NamedTemporaryFile("w", dir=temp_dir, delete=False) as tmp:
-        json.dump(data, tmp, indent=2)
-        tmp.flush()
-        os.fsync(tmp.fileno())  # Ensure data is written to disk
-        temp_path = tmp.name
+try:
+    state = read_state_file(STATE_PATH)  # Use the locking mechanism for the initial load
+except Exception as e:
+    logger.critical(f"Failed to load state.json with locking during startup: {e}")
+    state = {"chats": {}}  # Initialize default state if loading fails
 
-    for attempt in range(1, retries + 1):
-        try:
-            with open(state_path, "a") as f:
-                fcntl.flock(f, fcntl.LOCK_EX)  # Acquire an exclusive lock
-                try:
-                    os.rename(temp_path, state_path)  # Atomically replace the file
-                    return
-                finally:
-                    fcntl.flock(f, fcntl.LOCK_UN)  # Release the lock
-        except BlockingIOError:
-            if attempt < retries:
-                logger.warning(f"State file locked for writing (attempt {attempt}/{retries}). Retrying in {delay} seconds...")
-                time.sleep(delay)
-            else:
-                logger.error("Failed to acquire exclusive lock on state file after multiple attempts.")
-                raise
+# Build Discord channel ID → iMessage GUID map
+channel_to_chat = {
+    str(chat_info["discord_channel_id"]): chat_guid
+    for chat_guid, chat_info in state.get("chats", {}).items()
+    if "discord_channel_id" in chat_info
+}
+
+discord_token = config["discord_bot_token"]
+user_whitelist = config.get("user_id_whitelist", [])  # Optional: list of Discord user IDs allowed to reply
+
+# Setup Discord client
+intents = discord.Intents.default()
+intents.messages = True
+intents.message_content = True
+client = discord.Client(intents=intents)
+
+state_lock = asyncio.Lock()
 
 async def reload_state():
     global state, channel_to_chat

@@ -76,14 +76,6 @@ def load_json_with_backup(path):
         state["chats"] = {}
     return state
 
-# Save JSON with error handling
-def save_json(path, data):
-    try:
-        with open(path, "w") as f:
-            json.dump(data, f, indent=2)
-    except IOError as e:
-        logger.error(f"Failed to save JSON to {path}: {e}")
-
 # Escape special characters in Discord messages
 def notify_admin(bot_token, admin_channel_id, message):
     try:
@@ -189,28 +181,6 @@ def send_to_discord_channel(bot_token, channel_id, content):
         logger.error(f"HTTP error while sending message to Discord channel {channel_id}: {e}")
         return False
 
-def send_to_discord(webhook_url, sender, message_text, timestamp, chat_guid):
-    try:
-        content = f"[{sender} @ {timestamp}]: {message_text}"
-        payload = {
-            "username": chat_guid,
-            "content": content
-        }
-        while True:
-            response = requests.post(webhook_url, json=payload)
-            if response.status_code == 204:
-                return True  # Message sent successfully
-            elif response.status_code == 429:  # Rate-limited
-                retry_after = float(response.headers.get("Retry-After", 1))  # Default to 1 second if missing
-                logger.warning(f"Rate-limited by Discord webhook. Retrying after {retry_after} seconds...")
-                time.sleep(retry_after)
-            else:
-                logger.error(f"Failed to send message via webhook: {response.status_code} - {response.text}")
-                return False
-    except requests.RequestException as e:
-        logger.error(f"HTTP error while sending message via webhook: {e}")
-        return False
-
 def get_active_chats(chat_db, since_time):
     try:
         query = f"""
@@ -260,41 +230,6 @@ def burst_check(message_times, now, threshold_count, window_seconds):
         message_times.popleft()
     return len(message_times) >= threshold_count
 
-def update_state_file(state, chat_guid, discord_channel_id, default_poll_interval):
-    state["chats"][chat_guid] = {
-        "discord_channel_id": discord_channel_id,
-        "last_seen_rowid": 0,
-        "poll_interval": default_poll_interval,
-        "message_times": [],
-        "burst_mode": False,
-        "last_polled": "1970-01-01T00:00:00",
-        "active_until": datetime.utcnow().isoformat(),
-        "last_name_check": "1970-01-01T00:00:00"
-    }
-    save_json(STATE_PATH, state)
-    logger.info(f"Updated state.json with new chat: {chat_guid} → {discord_channel_id}")
-
-# Sanitize AppleScript inputs
-async def send_imessage_async(chat_guid, message):
-    script = '''
-on run {chatID, messageText}
-    set safeMessage to quoted form of messageText
-    tell application "Messages"
-        send safeMessage to chat id chatID
-    end tell
-end run
-'''
-    process = await asyncio.create_subprocess_exec(
-        "osascript", "-e", script, "--args", chat_guid, message,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    stdout, stderr = await process.communicate()
-    if process.returncode != 0:
-        logger.error(f"AppleScript error: {stderr.decode().strip()}")
-        return False
-    return True
-
 # Read the state file with a shared lock and retries
 def read_state_file(state_path, retries=10, delay=0.1):
     for attempt in range(1, retries + 1):
@@ -340,15 +275,17 @@ def write_state_file(state_path, data, retries=10, delay=0.1):
                 raise
 
 def main():
-    # Load configuration and state
+    # Load configuration
     config = load_json_with_backup(CONFIG_PATH)
     if not validate_config(config):
         logger.critical("Invalid configuration. Exiting.")
         return
 
-    state = load_json_with_backup(STATE_PATH)
-    if not state:
-        logger.critical("Failed to load state.json. System is non-functional.")
+    # Load state with locking
+    try:
+        state = read_state_file(STATE_PATH)
+    except Exception as e:
+        logger.critical(f"Failed to load state.json with locking: {e}")
         return
 
     # Ensure "chats" key exists in the state
@@ -412,7 +349,10 @@ def main():
                         chat_state["discord_channel_id"] = str(channel_id)
                         welcome = f"[Bridge initialized for iMessage chat with: {', '.join(participants)}]"
                         send_to_discord_channel(bot_token, channel_id, welcome)
-                        update_state_file(state, chat_guid, channel_id, default_poll_interval)
+                        try:
+                            write_state_file(STATE_PATH, state)
+                        except Exception as e:
+                            logger.error(f"Failed to update state.json with locking: {e}")
             state["last_global_poll"] = now.isoformat()
 
         soonest_next_poll = now + timedelta(seconds=default_poll_interval)
@@ -468,8 +408,11 @@ def main():
             chat_state["burst_mode"] = burst_check(times, now, burst_trigger_count, burst_window_seconds)
             chat_state["message_times"] = list(times)
 
-        # Save state after processing all chats
-        save_json(STATE_PATH, state)
+        # Save state after processing all chats with locking
+        try:
+            write_state_file(STATE_PATH, state)
+        except Exception as e:
+            logger.error(f"Failed to save state.json with locking: {e}")
 
         # Sleep until the soonest next poll time
         sleep_duration = max(0.1, (soonest_next_poll - datetime.utcnow()).total_seconds())
