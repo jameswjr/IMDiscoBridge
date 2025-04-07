@@ -71,11 +71,6 @@ def load_json_with_backup(path):
             logger.warning(f"Backed up corrupted file to {backup_path}")
     return {}
 
-    # Ensure "chats" key exists in the state
-    if "chats" not in state:
-        state["chats"] = {}
-    return state
-
 # Escape special characters in Discord messages
 def notify_admin(bot_token, admin_channel_id, message):
     try:
