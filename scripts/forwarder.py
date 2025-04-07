@@ -1,6 +1,8 @@
 import os
 import json
 import time
+import fcntl  # For file locking
+import tempfile  # For atomic writes
 import sqlite3
 import requests
 import logging
@@ -292,6 +294,50 @@ end run
         logger.error(f"AppleScript error: {stderr.decode().strip()}")
         return False
     return True
+
+# Read the state file with a shared lock and retries
+def read_state_file(state_path, retries=10, delay=0.1):
+    for attempt in range(1, retries + 1):
+        try:
+            with open(state_path, "r") as f:
+                fcntl.flock(f, fcntl.LOCK_SH)  # Acquire a shared lock
+                try:
+                    return json.load(f)
+                finally:
+                    fcntl.flock(f, fcntl.LOCK_UN)  # Release the lock
+        except BlockingIOError:
+            if attempt < retries:
+                logger.warning(f"State file locked (attempt {attempt}/{retries}). Retrying in {delay} seconds...")
+                time.sleep(delay)
+            else:
+                logger.error("Failed to acquire shared lock on state file after multiple attempts.")
+                raise
+
+# Write the state file atomically with an exclusive lock and retries
+def write_state_file(state_path, data, retries=10, delay=0.1):
+    temp_dir = os.path.dirname(state_path)
+    with tempfile.NamedTemporaryFile("w", dir=temp_dir, delete=False) as tmp:
+        json.dump(data, tmp, indent=2)
+        tmp.flush()
+        os.fsync(tmp.fileno())  # Ensure data is written to disk
+        temp_path = tmp.name
+
+    for attempt in range(1, retries + 1):
+        try:
+            with open(state_path, "a") as f:
+                fcntl.flock(f, fcntl.LOCK_EX)  # Acquire an exclusive lock
+                try:
+                    os.rename(temp_path, state_path)  # Atomically replace the file
+                    return
+                finally:
+                    fcntl.flock(f, fcntl.LOCK_UN)  # Release the lock
+        except BlockingIOError:
+            if attempt < retries:
+                logger.warning(f"State file locked for writing (attempt {attempt}/{retries}). Retrying in {delay} seconds...")
+                time.sleep(delay)
+            else:
+                logger.error("Failed to acquire exclusive lock on state file after multiple attempts.")
+                raise
 
 def main():
     # Load configuration and state
